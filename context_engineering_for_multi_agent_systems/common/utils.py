@@ -1,4 +1,19 @@
 import os
+import subprocess
+import sys
+
+def install_dependencies():
+    """
+    Installs all the required pip packages with specific versions.
+    """
+    print("🚀 Installing required packages...")
+    try:
+        # Using subprocess to run pip commands
+        subprocess.run([sys.executable, "-m", "pip", "install", "tqdm==4.67.1", "--upgrade", "--quiet"], check=True)
+        subprocess.run([sys.executable, "-m", "pip", "install", "openai==2.8.1", "pinecone==7.0.0", "tenacity==9.0.0", "--quiet"], check=True)
+        print("✅ All packages installed successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"🛑 Error during installation: {e}")
 
 def initialize_clients():
     from openai import OpenAI
