@@ -1,4 +1,3 @@
-from http.client import responses
 
 
 def create_mcp_message(sender, content, metadata=None):
