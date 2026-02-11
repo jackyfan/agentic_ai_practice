@@ -26,7 +26,8 @@ def initialize_clients():
     try:
         # Load OpenAI API Key
         os.environ["OPENAI_API_KEY"] = os.getenv("DEEPSEEK_API_KEY")
-        openai_client = OpenAI()
+        base_url = "https://api.deepseek.com/v1"
+        openai_client = OpenAI(base_url=base_url)
         print("   - OpenAI client initialized.")
 
         # Load Pinecone API Key and initialize client
