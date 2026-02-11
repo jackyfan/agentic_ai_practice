@@ -1,4 +1,4 @@
-from common.utils import initialize_clients
+from commons.utils import initialize_clients
 
 client, _ = initialize_clients()
 
