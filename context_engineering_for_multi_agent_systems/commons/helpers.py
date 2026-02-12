@@ -1,6 +1,10 @@
 from utils import initialize_clients
 import time
 from openai import APIError
+import textwrap
+from tenacity import retry, stop_after_attempt, wait_random_exponential
+
+
 def create_mcp_message(sender, content, metadata=None):
     """
     Create a standardized message for the MCP.
@@ -18,7 +22,7 @@ def call_llm(system_prompt, user_prompt):
     Call the LLM with the given prompt.
     """
     try:
-        client,_ = initialize_clients()
+        client, _ = initialize_clients()
         response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[{"role": "system", "content": system_prompt},
@@ -28,8 +32,27 @@ def call_llm(system_prompt, user_prompt):
     except Exception as e:
         return f"An error occurred with the API call: {e}"
 
+@retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+def call_llm(system_prompt, user_prompt,client, temperature=1, json_mode=False):
+    """A centralized function to handle all LLM interactions with retries."""
+    try:
+        response_format = {"type": "json_object"} if json_mode else {"type": "text"}
+        response = client.chat.completions.create(
+            model="qwen-plus",
+            response_format=response_format,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=temperature
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"Error calling LLM: {e}")
+        return f"LLM Error: {e}"
 
-def call_llm_robust(system_prompt, user_content,client, retries=3, delay=5):
+
+def call_llm_robust(system_prompt, user_content, client, retries=3, delay=5):
     """
     A more robust helper function to call the OpenAI API with retries.
     """
@@ -42,7 +65,7 @@ def call_llm_robust(system_prompt, user_content,client, retries=3, delay=5):
             )
             return response.choices[0].message.content
         except Exception as e:
-            print(f"API call failed on attempt {i+1}/{retries}. Error: {e}")
+            print(f"API call failed on attempt {i + 1}/{retries}. Error: {e}")
             if i < retries - 1:
                 print(f"Retrying in {delay} seconds...")
                 time.sleep(delay)
@@ -50,12 +73,14 @@ def call_llm_robust(system_prompt, user_content,client, retries=3, delay=5):
                 print("All retries failed.")
             return None
 
-
-def get_embedding(text, client, embedding_model):
+@retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+def get_embedding(text):
     """
     Generates embeddings for a single text query with retries.
     UPGRADE: Now requires the 'client' and 'embedding_model' objects.
     """
+    client, _ = initialize_clients()
+    embedding_model = "text-embedding-v2"
     text = text.replace("\n", " ")
     try:
         # UPGRADE: Uses the passed-in client and model name.
@@ -67,3 +92,34 @@ def get_embedding(text, client, embedding_model):
     except Exception as e:
         print(f"An unexpected error occurred in get_embedding: {e}")
         raise e
+
+
+def display_mcp(message, title="MCP Message"):
+    """Helper function to display MCP messages clearly during the trace."""
+    print(f"\n--- {title} (Sender: {message['sender']}) ---")
+    # Display content snippet or keys if content is complex
+    if isinstance(message['content'], dict):
+        print(f"Content Keys: {list(message['content'].keys())}")
+    else:
+        print(f"Content: {textwrap.shorten(str(message['content']), width=100)}")
+    # Display metadata keys
+    print(f"Metadata Keys: {list(message['metadata'].keys())}")
+    print("-" * (len(title) + 25))
+
+
+def query_pinecone(query_text, namespace, top_k=1):
+    """Embeds the query text and searches the specified Pinecone namespace."""
+    try:
+        query_embedding = get_embedding(query_text)
+        _,pc = initialize_clients()
+        INDEX_NAME = 'genai-mas-mcp-ch3'
+        response = pc.Index(INDEX_NAME).query(
+            vector=query_embedding,
+            namespace=namespace,
+            top_k=top_k,
+            include_metadata=True
+        )
+        return response['matches']
+    except Exception as e:
+        print(f"Error querying Pinecone (Namespace: {namespace}): {e}")
+        return []
