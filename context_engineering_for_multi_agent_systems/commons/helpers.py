@@ -36,7 +36,7 @@ def call_llm_robust(system_prompt, user_content,client, retries=3, delay=5):
     for i in range(retries):
         try:
             response = client.chat.completions.create(
-                model="deepseek-chat",
+                model="qwen-plus",
                 messages=[{"role": "system", "content": system_prompt},
                           {"role": "user", "content": user_content}]
             )

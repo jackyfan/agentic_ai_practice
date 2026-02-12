@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 
+
 def install_dependencies():
     """
     Installs all the required pip packages with specific versions.
@@ -15,6 +16,7 @@ def install_dependencies():
     except subprocess.CalledProcessError as e:
         print(f"🛑 Error during installation: {e}")
 
+
 def initialize_clients():
     from openai import OpenAI
     from pinecone import Pinecone, ServerlessSpec
@@ -25,13 +27,13 @@ def initialize_clients():
     print("\n🔑 Initializing API clients...")
     try:
         # Load OpenAI API Key
-        os.environ["OPENAI_API_KEY"] = os.getenv("DEEPSEEK_API_KEY")
-        base_url = "https://api.deepseek.com/v1"
-        openai_client = OpenAI(base_url=base_url)
+        open_api_key = os.getenv("DASHSCOPE_API_KEY")
+        base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        openai_client = OpenAI(api_key=open_api_key, base_url=base_url)
         print("   - OpenAI client initialized.")
 
         # Load Pinecone API Key and initialize client
-        pinecone_api_key = os.getenv("COLLECTION_NAME")
+        pinecone_api_key = os.getenv("PINECONE_API_KEY")
         pinecone_client = Pinecone(api_key=pinecone_api_key)
         print("   - Pinecone client initialized.")
 
@@ -41,6 +43,3 @@ def initialize_clients():
     except Exception as e:
         print(f"An error occurred during client initialization: {e}")
         return None, None
-
-if __name__ == "__main__":
-    initialize_clients()
