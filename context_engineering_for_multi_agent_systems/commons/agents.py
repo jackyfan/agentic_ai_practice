@@ -6,7 +6,7 @@ def researcher_agent(mcp_input):
     """
     This agent takes a research topic, finds information, and returns a summary.
     """
-    print("\n[Researcher Agent Activated]")
+    print("\n[研究Agent已激活]")
     simulated_database = {
         "mediterranean diet": """The Mediterranean diet is rich in fruits,
            vegetables, whole grains, olive oil, and fish.Studies show it is associated with
@@ -16,8 +16,7 @@ def researcher_agent(mcp_input):
     research_topic = mcp_input['content']
     research_result = simulated_database.get(research_topic.lower(),
                                              "No information found on this topic.")
-    system_prompt = """You are a research analyst. Your task is to synthesize the 
-       provided information into 3-4 concise bullet points. Focus on the key findings."""
+    system_prompt = """你是一名研究分析师。请将提供的信息整理为 3–4 条简洁的要点，仅聚焦于关键发现与核心结论。"""
 
     summary = call_llm_robust(system_prompt, research_result)
     print(f"Research summary created for: '{research_topic}'")
@@ -32,12 +31,11 @@ def writer_agent(mcp_input):
     """
     This agent takes research findings and writes a short blog post.
      """
-    print("\n[Writer Agent Activated]")
+    print("\n[创作Agent已激活]")
     research_summary = mcp_input['content']
-    system_prompt = """You are a skilled content writer for a health and wellness blog. 
-    Your tone is engaging, informative, and encouraging. 
-    Your task is to take the following research points and write a short, 
-    appealing blog post (approx. 150 words) with a catchy title."""
+    system_prompt = """你是一名经验丰富的健康养生类专栏撰稿人，
+    文风亲切自然、内容实用、语气积极鼓舞。
+    请根据以下研究要点，创作一篇约 150 字、简短有吸引力的短文，并配上吸睛标题。"""
 
     blog_post = call_llm_robust(system_prompt, research_summary)
     print("Blog post drafted.")
@@ -51,7 +49,7 @@ def writer_agent(mcp_input):
 # --- Agent 3: The Validator ---
 def validator_agent(mcp_input):
     """This agent fact-checks a draft against a source summary."""
-    print("\n[Validator Agent Activated]")
+    print("\n[验证Agent已激活]")
     # Extracting the two required pieces of information
     source_summary = mcp_input['content']['summary']
     draft_post = mcp_input['content']['draft']
@@ -65,7 +63,7 @@ def validator_agent(mcp_input):
      """
     validation_context = f"SOURCE SUMMARY:\n{source_summary}\n\nDRAFT:\n{draft_post}"
     validation_result = call_llm_robust(system_prompt, validation_context)
-    print(f"Validation complete. Result: {validation_result}")
+    print(f"验证已完成，结果: {validation_result}")
     return create_mcp_message(
         sender="ValidatorAgent",
         content=validation_result
@@ -91,11 +89,11 @@ def orchestrator(initial_goal):
     Manages the multi-agent workflow to achieve a high-level goal.
     """
     print("=" * 50)
-    print(f"[Orchestrator] Goal Received: '{initial_goal}'")
+    print(f"[编排器] Goal Received: '{initial_goal}'")
     print("=" * 50)
 
     # --- Step 1: Orchestrator plans and calls the Researcher Agent ---
-    print("\n[Orchestrator] Task 1: Research. Delegating to Researcher Agent.")
+    print("\n[编排器]任务1: Research. Delegating to Researcher Agent.")
     research_topic = "Mediterranean Diet"
 
     mcp_to_researcher = create_mcp_message(
@@ -104,25 +102,25 @@ def orchestrator(initial_goal):
     )
 
     mcp_from_researcher = researcher_agent(mcp_to_researcher)
-    print("\n[Orchestrator] Research complete. Received summary:")
+    print("\n[编排器] Research complete. Received summary:")
     print("-" * 20)
     print(mcp_from_researcher['content'])
     print("-" * 20)
 
     # --- Step 2: Orchestrator calls the Writer Agent ---
-    print("\n[Orchestrator] Task 2: Write Content. Delegating to Writer Agent.")
+    print("\n[编排器]任务2: Write Content. Delegating to Writer Agent.")
     mcp_to_writer = create_mcp_message(
         sender="Orchestrator",
         content=mcp_from_researcher['content']
     )
 
     mcp_from_writer = writer_agent(mcp_to_writer)
-    print("\n[Orchestrator] Writing complete.")
+    print("\n[编排器] Writing complete.")
 
     # --- Step 3: Orchestrator presents the final result ---
     final_output = mcp_from_writer['content']
     print("\n" + "=" * 50)
-    print("[Orchestrator] Workflow Complete. Final Output:")
+    print("[编排器] Workflow Complete. Final Output:")
     print("=" * 50)
     print(final_output)
 
@@ -131,11 +129,11 @@ def final_orchestrator(initial_goal):
     Manages the multi-agent workflow to achieve a high-level goal.
     """
     print("=" * 50)
-    print(f"[Orchestrator] Goal Received: '{initial_goal}'")
+    print(f"[编排器] Goal Received: '{initial_goal}'")
     print("=" * 50)
 
     # --- Step 1: Orchestrator plans and calls the Researcher Agent ---
-    print("\n[Orchestrator] Task 1: Research. Delegating to Researcher Agent.")
+    print("\n[编排器]任务1: Research. Delegating to Researcher Agent.")
     research_topic = "Mediterranean Diet"
 
     mcp_to_researcher = create_mcp_message(
@@ -149,7 +147,7 @@ def final_orchestrator(initial_goal):
         print("Workflow failed due to invalid or empty message from Researcher.")
         return
     research_summary = mcp_from_researcher['content']
-    print("\n[Orchestrator] Research complete. Received summary:")
+    print("\n[编排器] Research complete. Received summary:")
     print("-" * 20)
     print(research_summary)
     print("-" * 20)
@@ -158,7 +156,7 @@ def final_orchestrator(initial_goal):
     final_output = "Could not produce a validated article."
     max_revisions = 2
     for i in range(max_revisions):
-        print(f"\n[Orchestrator] Writing Attempt {i + 1}/{max_revisions}")
+        print(f"\n[编排器] Writing Attempt {i + 1}/{max_revisions}")
 
         writer_context = research_summary
         if i > 0:
@@ -173,7 +171,7 @@ def final_orchestrator(initial_goal):
         draft_post = mcp_from_writer['content']
 
         # --- Validation Step ---
-        print("\n[Orchestrator] Draft received. Delegating to Validator Agent.")
+        print("\n[编排器] Draft received. Delegating to Validator Agent.")
         validation_content = {"summary": research_summary, "draft": draft_post}
         mcp_to_validator = create_mcp_message(sender="Orchestrator", content=validation_content)
         mcp_from_validator = validator_agent(mcp_to_validator)
@@ -184,11 +182,11 @@ def final_orchestrator(initial_goal):
         validation_result = mcp_from_validator['content']
 
         if "pass" in validation_result.lower():
-            print("\n[Orchestrator] Validation PASSED. Finalizing content.")
+            print("\n[编排器] Validation PASSED. Finalizing content.")
             final_output = draft_post
             break
         else:
-            print(f"\n[Orchestrator] Validation FAILED. Feedback: {validation_result}")
+            print(f"\n[编排器] Validation FAILED. Feedback: {validation_result}")
             if i < max_revisions - 1:
                 print("Requesting revision.")
             else:
@@ -196,11 +194,11 @@ def final_orchestrator(initial_goal):
 
     # --- Step 4: Final Presentation ---
     print("\n" + "=" * 50)
-    print("[Orchestrator] Workflow Complete. Final Output:")
+    print("[编排器] Workflow Complete. Final Output:")
     print("=" * 50)
     print(final_output)
 
 if __name__ == "__main__":
     # @title 6.Run the Final, Robust System
-    user_goal = "Create a blog post about the benefits of the Mediterranean diet."
+    user_goal = "撰写一篇关于地中海饮食益处的博客文章。"
     final_orchestrator(user_goal)
