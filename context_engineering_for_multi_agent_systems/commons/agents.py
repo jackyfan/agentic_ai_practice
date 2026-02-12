@@ -1,8 +1,9 @@
-from context_engineering_for_multi_agent_systems.commons.helpers import call_llm_robust
-from helpers import call_llm, create_mcp_message
+from helpers import create_mcp_message,call_llm_robust
+from utils import initialize_clients
 
 
-def researcher_agent(mcp_input):
+
+def researcher_agent(mcp_input,client):
     """
     This agent takes a research topic, finds information, and returns a summary.
     """
@@ -18,7 +19,7 @@ def researcher_agent(mcp_input):
                                              "No information found on this topic.")
     system_prompt = """你是一名研究分析师。请将提供的信息整理为 3–4 条简洁的要点，仅聚焦于关键发现与核心结论。"""
 
-    summary = call_llm_robust(system_prompt, research_result)
+    summary = call_llm_robust(system_prompt, research_result,client)
     print(f"Research summary created for: '{research_topic}'")
     return create_mcp_message(
         sender="ResearcherAgent",
@@ -27,7 +28,7 @@ def researcher_agent(mcp_input):
     )
 
 
-def writer_agent(mcp_input):
+def writer_agent(mcp_input,client):
     """
     This agent takes research findings and writes a short blog post.
      """
@@ -37,7 +38,7 @@ def writer_agent(mcp_input):
     文风亲切自然、内容实用、语气积极鼓舞。
     请根据以下研究要点，创作一篇约 150 字、简短有吸引力的短文，并配上吸睛标题。"""
 
-    blog_post = call_llm_robust(system_prompt, research_summary)
+    blog_post = call_llm_robust(system_prompt, research_summary,client)
     print("Blog post drafted.")
     return create_mcp_message(
         sender="WriterAgent",
@@ -47,7 +48,7 @@ def writer_agent(mcp_input):
 
 
 # --- Agent 3: The Validator ---
-def validator_agent(mcp_input):
+def validator_agent(mcp_input,client):
     """This agent fact-checks a draft against a source summary."""
     print("\n[验证Agent已激活]")
     # Extracting the two required pieces of information
@@ -62,7 +63,7 @@ def validator_agent(mcp_input):
     \"fail\" and a one-sentence explanation.
      """
     validation_context = f"SOURCE SUMMARY:\n{source_summary}\n\nDRAFT:\n{draft_post}"
-    validation_result = call_llm_robust(system_prompt, validation_context)
+    validation_result = call_llm_robust(system_prompt, validation_context, client)
     print(f"验证已完成，结果: {validation_result}")
     return create_mcp_message(
         sender="ValidatorAgent",
@@ -91,6 +92,7 @@ def orchestrator(initial_goal):
     print("=" * 50)
     print(f"[编排器] Goal Received: '{initial_goal}'")
     print("=" * 50)
+    client, _ = initialize_clients()
 
     # --- Step 1: Orchestrator plans and calls the Researcher Agent ---
     print("\n[编排器]任务1: Research. Delegating to Researcher Agent.")
@@ -131,7 +133,7 @@ def final_orchestrator(initial_goal):
     print("=" * 50)
     print(f"[编排器] Goal Received: '{initial_goal}'")
     print("=" * 50)
-
+    client , _ = initialize_clients()
     # --- Step 1: Orchestrator plans and calls the Researcher Agent ---
     print("\n[编排器]任务1: Research. Delegating to Researcher Agent.")
     research_topic = "Mediterranean Diet"
@@ -141,7 +143,7 @@ def final_orchestrator(initial_goal):
         content=research_topic
     )
 
-    mcp_from_researcher = researcher_agent(mcp_to_researcher)
+    mcp_from_researcher = researcher_agent(mcp_to_researcher,client)
 
     if not validate_mcp_message(mcp_from_researcher) or not mcp_from_researcher['content']:
         print("Workflow failed due to invalid or empty message from Researcher.")
@@ -163,7 +165,7 @@ def final_orchestrator(initial_goal):
             writer_context += f"\n\nPlease revise the previous draft based on this feedback: {validation_result}"
 
         mcp_to_writer = create_mcp_message(sender="Orchestrator", content=writer_context)
-        mcp_from_writer = writer_agent(mcp_to_writer)
+        mcp_from_writer = writer_agent(mcp_to_writer,client)
 
         if not validate_mcp_message(mcp_from_writer) or not mcp_from_writer['content']:
             print("Aborting revision loop due to invalid message from Writer.")
@@ -174,7 +176,7 @@ def final_orchestrator(initial_goal):
         print("\n[编排器] Draft received. Delegating to Validator Agent.")
         validation_content = {"summary": research_summary, "draft": draft_post}
         mcp_to_validator = create_mcp_message(sender="Orchestrator", content=validation_content)
-        mcp_from_validator = validator_agent(mcp_to_validator)
+        mcp_from_validator = validator_agent(mcp_to_validator,client)
 
         if not validate_mcp_message(mcp_from_validator) or not mcp_from_validator['content']:
             print("Aborting revision loop due to invalid message from Validator.")
