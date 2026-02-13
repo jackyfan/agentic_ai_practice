@@ -124,7 +124,7 @@ def validate_mcp_message(message):
     return True
 
 
-def agent_context_librarian(mcp_message):
+def agent_context_librarian(mcp_message, client):
     """
      Retrieves the appropriate Semantic Blueprint from the Context Library.
      """

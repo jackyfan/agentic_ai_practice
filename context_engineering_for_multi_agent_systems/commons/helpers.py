@@ -53,30 +53,30 @@ def call_llm(system_prompt, user_prompt,client, temperature=1, json_mode=False):
 
 
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-def call_llm_robust(system_prompt, user_prompt, client, generation_model, json_mode=False):
+def call_llm_robust(system_prompt, user_prompt, client, json_mode=False):
     """
     A centralized function to handle all LLM interactions with retries.
     UPGRADE: Now requires the 'client' and 'generation_model' objects to be passed in.
     """
-    logging.info("Attempting to call LLM...")
+    print("Attempting to call LLM...")
     try:
         response_format = {"type": "json_object"} if json_mode else {"type": "text"}
         # UPGRADE: Uses the passed-in client and model name for the API call.
         response = client.chat.completions.create(
-            model=generation_model,
+            model="qwen-plus",
             response_format=response_format,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
         )
-        logging.info("LLM call successful.")
+        print("LLM call successful.")
         return response.choices[0].message.content.strip()
     except APIError as e:
-        logging.error(f"OpenAI API Error in call_llm_robust: {e}")
+        print(f"OpenAI API Error in call_llm_robust: {e}")
         raise e
     except Exception as e:
-        logging.error(f"An unexpected error occurred in call_llm_robust: {e}")
+        print(f"An unexpected error occurred in call_llm_robust: {e}")
         raise e
 
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
