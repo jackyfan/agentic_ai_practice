@@ -12,6 +12,9 @@ def researcher_agent(mcp_message, client):
    """
     print("\n[Researcher] Activated. Investigating topic...")
     topic = mcp_message['content']['topic_query']
+    if not topic:
+        raise ValueError("Researcher requires 'topic_query' in the input content.")
+
     NAMESPACE_KNOWLEDGE = "KnowledgeStore"
     # Query Pinecone Knowledge Namespace
     results = query_pinecone(topic, NAMESPACE_KNOWLEDGE, top_k=3)
@@ -30,20 +33,33 @@ def researcher_agent(mcp_message, client):
 
     user_prompt = f"Topic: {topic}\n\nSources:\n" + "\n\n---\n\n".join(source_texts)
 
-    findings = call_llm(system_prompt, user_prompt, client)
+    findings = call_llm_robust(system_prompt, user_prompt, client)
 
-    return create_mcp_message("Researcher", {"facts": findings})
+    return create_mcp_message("Researcher", findings)
 
 
-def writer_agent(mcp_input, client):
+def writer_agent(mcp_message, client):
     """
     Combines the factual research with the semantic blueprint to generate the final output.
     """
     print("\n[Writer] Activated. Applying blueprint to facts...")
 
-    facts = mcp_input['content']['facts']
+    facts = mcp_message['content']['facts']
     # The blueprint is passed as a JSON string
-    blueprint_json_string = mcp_input['content']['blueprint']
+    blueprint_json_string = mcp_message['content']['blueprint']
+    previous_content = mcp_message['content'].get('previous_content')
+
+    if not blueprint_json_string:
+        raise ValueError("Writer requires 'blueprint' in the input content.")
+
+    if facts:
+        source_material = facts
+        source_label = "RESEARCH FINDINGS"
+    elif previous_content:
+        source_material = previous_content
+        source_label = "PREVIOUS CONTENT (For Rewriting)"
+    else:
+        raise ValueError("Writer requires either 'facts' or 'previous_content'.")
 
     # The Writer's System Prompt incorporates the dynamically retrieved blueprint
     system_prompt = f"""You are an expert content generation AI.
@@ -58,17 +74,16 @@ def writer_agent(mcp_input, client):
     """
 
     user_prompt = f"""
-    --- RESEARCH FINDINGS ---
-    {facts}
-    --- END RESEARCH FINDINGS ---
-
-    Generate the content now.
-    """
+    --- SOURCE MATERIAL ({source_label}) ---
+    {source_material}
+     --- END SOURCE MATERIAL ---
+     Generate the content now, following the blueprint precisely.
+     """
 
     # Generate the final content (slightly higher temperature for potential creativity)
     final_output = call_llm(system_prompt, user_prompt, client)
 
-    return create_mcp_message("Writer", {"output": final_output})
+    return create_mcp_message("Writer", final_output)
 
 
 # --- Agent 3: The Validator ---
@@ -113,17 +128,19 @@ def agent_context_librarian(mcp_message):
     """
      Retrieves the appropriate Semantic Blueprint from the Context Library.
      """
-    print("\\n[Librarian] Activated. Analyzing intent...")
+    print("\\n[上下文管理员] 已激活. Analyzing intent...")
     requested_intent = mcp_message['content']['intent_query']
+    if not requested_intent:
+        raise ValueError("Librarian requires 'intent_query' in the input content.")
     NAMESPACE_CONTEXT = "ContextLibrary"
     results = query_pinecone(requested_intent, NAMESPACE_CONTEXT, top_k=1)
     if results:
         match = results[0]
-        print(f"[Librarian] Found blueprint '{match['id']}' (Score: {match['score']: .2f})")
+        print(f"[上下文管理员] Found blueprint '{match['id']}' (Score: {match['score']: .2f})")
         blueprint_json = match['metadata']['blueprint_json']
         content = {"blueprint": blueprint_json}
     else:
-        print("[Librarian] No specific blueprint found. Returning default.")
+        print("[上下文管理员] No specific blueprint found. Returning default.")
         content = {"blueprint": json.dumps({"instruction": "Generate the contentneutrally."})}
     return create_mcp_message("Librarian", content)
 
