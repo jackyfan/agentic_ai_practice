@@ -1,5 +1,5 @@
 from utils import initialize_clients
-import time
+import logging
 from openai import APIError
 import textwrap
 from tenacity import retry, stop_after_attempt, wait_random_exponential
@@ -52,26 +52,32 @@ def call_llm(system_prompt, user_prompt,client, temperature=1, json_mode=False):
         return f"LLM Error: {e}"
 
 
-def call_llm_robust(system_prompt, user_content, client, retries=3, delay=5):
+@retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
+def call_llm_robust(system_prompt, user_prompt, client, generation_model, json_mode=False):
     """
-    A more robust helper function to call the OpenAI API with retries.
+    A centralized function to handle all LLM interactions with retries.
+    UPGRADE: Now requires the 'client' and 'generation_model' objects to be passed in.
     """
-    for i in range(retries):
-        try:
-            response = client.chat.completions.create(
-                model="qwen-plus",
-                messages=[{"role": "system", "content": system_prompt},
-                          {"role": "user", "content": user_content}]
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            print(f"API call failed on attempt {i + 1}/{retries}. Error: {e}")
-            if i < retries - 1:
-                print(f"Retrying in {delay} seconds...")
-                time.sleep(delay)
-            else:
-                print("All retries failed.")
-            return None
+    logging.info("Attempting to call LLM...")
+    try:
+        response_format = {"type": "json_object"} if json_mode else {"type": "text"}
+        # UPGRADE: Uses the passed-in client and model name for the API call.
+        response = client.chat.completions.create(
+            model=generation_model,
+            response_format=response_format,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+        )
+        logging.info("LLM call successful.")
+        return response.choices[0].message.content.strip()
+    except APIError as e:
+        logging.error(f"OpenAI API Error in call_llm_robust: {e}")
+        raise e
+    except Exception as e:
+        logging.error(f"An unexpected error occurred in call_llm_robust: {e}")
+        raise e
 
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
 def get_embedding(text):
