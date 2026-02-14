@@ -28,8 +28,10 @@ def researcher_agent(mcp_message, client, index, generation_model, embedding_mod
         system_prompt = """You are an expert research synthesis AI.
             Synthesize the provided source texts into a concise, bullet-pointed summary relevant to the user's topic. 
             Focus strictly on the facts provided in the sources. Do not add outside information."""
+
         user_prompt = f"Topic: {topic}\n\nSources:\n" + "\n\n---\n\n".join(source_texts)
-        findings = call_llm_robust(system_prompt, user_prompt, client, generation_mode=generation_model)
+        findings = call_llm_robust(system_prompt, user_prompt, client, generation_model=generation_model)
+        logging.info(f"[Researcher] Synthesized findings: {findings}")
         return create_mcp_message("Researcher", {"facts": findings})
     except Exception as e:
         logging.error(f"[Researcher] An error occurred: {e}")
@@ -47,7 +49,7 @@ def writer_agent(mcp_message, client, generation_model):
         previous_content_data = mcp_message['content'].get('previous_content')
 
         # Extract the actual strings, handling both dict and raw string inputs
-        blueprint_json_string = blueprint_data.get('blueprint_json') \
+        blueprint_json_string = blueprint_data.get('blueprint') \
             if isinstance(blueprint_data, dict) else blueprint_data
         facts = facts_data.get('facts') \
             if isinstance(facts_data, dict) else facts_data
@@ -84,7 +86,7 @@ def writer_agent(mcp_message, client, generation_model):
 
                Generate the content now, following the blueprint precisely.
                """
-
+        logging.info('[创作智能体] Call LLM...')
         # UPGRADE: Pass all dependencies to the robust LLM call.
         final_output = call_llm_robust(
             system_prompt,
@@ -92,9 +94,11 @@ def writer_agent(mcp_message, client, generation_model):
             client=client,
             generation_model=generation_model
         )
+        logging.info(f'final_output：{final_output}', )
         return create_mcp_message("Writer", final_output)
     except Exception as e:
         logging.error(f"[创作智能体] An error occurred: {e}")
+        print(f"【TypeError详情】: {str(e)}")
         raise e
 
 
@@ -145,7 +149,6 @@ def agent_context_librarian(mcp_message, client, index, embedding_model, namespa
         requested_intent = mcp_message['content']['intent_query']
         if not requested_intent:
             raise ValueError("Librarian requires 'intent_query' in the input content.")
-        NAMESPACE_CONTEXT = "ContextLibrary"
         results = query_pinecone(
             query_text=requested_intent,
             namespace=namespace_context,

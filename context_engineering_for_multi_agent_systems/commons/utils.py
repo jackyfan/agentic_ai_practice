@@ -1,45 +1,46 @@
 import os
 import subprocess
 import sys
+import logging
 
 
 def install_dependencies():
     """
     Installs all the required pip packages with specific versions.
     """
-    print("🚀 Installing required packages...")
+    logging.info("🚀 Installing required packages...")
     try:
         # Using subprocess to run pip commands
         subprocess.run([sys.executable, "-m", "pip", "install", "tqdm==4.67.1", "--upgrade", "--quiet"], check=True)
         subprocess.run([sys.executable, "-m", "pip", "install", "openai==2.8.1", "pinecone==7.0.0", "tenacity==9.0.0", "--quiet"], check=True)
-        print("✅ All packages installed successfully.")
+        logging.info("✅ All packages installed successfully.")
     except subprocess.CalledProcessError as e:
-        print(f"🛑 Error during installation: {e}")
+        logging.error(f"🛑 Error during installation: {e}")
 
 
 def initialize_clients():
     from openai import OpenAI
-    from pinecone import Pinecone, ServerlessSpec
+    from pinecone import Pinecone
     """
     Loads API keys from Colab Secrets and initializes OpenAI and Pinecone clients.
     Returns the initialized clients.
     """
-    print("\n🔑 Initializing API clients...")
+    logging.info("\n🔑 Initializing API clients...")
     try:
         # Load OpenAI API Key
         open_api_key = os.getenv("DASHSCOPE_API_KEY")
         base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
         openai_client = OpenAI(api_key=open_api_key, base_url=base_url)
-        print("   - OpenAI client initialized.")
+        logging.info("   - OpenAI client initialized.")
 
         # Load Pinecone API Key and initialize client
         pinecone_api_key = os.getenv("PINECONE_API_KEY")
         pinecone_client = Pinecone(api_key=pinecone_api_key)
-        print("   - Pinecone client initialized.")
+        logging.info("   - Pinecone client initialized.")
 
-        print("✅ Clients initialized successfully.")
+        logging.info("✅ Clients initialized successfully.")
         return openai_client, pinecone_client
 
     except Exception as e:
-        print(f"An error occurred during client initialization: {e}")
+        logging.error(f"An error occurred during client initialization: {e}")
         return None, None

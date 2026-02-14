@@ -59,3 +59,5 @@ class AgentRegistry:
          - "previous_content": (String/Reference) Existing text for rewriting.
        OUTPUT: The final generated text (String).
     """
+
+AGENT_TOOLKIT = AgentRegistry()

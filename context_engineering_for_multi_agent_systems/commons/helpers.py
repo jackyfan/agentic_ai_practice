@@ -7,8 +7,7 @@ import tiktoken
 
 # === Configure Production-Level Logging ===
 logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
-
+                    format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
 
 def create_mcp_message(sender, content, metadata=None):
     """
@@ -59,7 +58,7 @@ def call_llm(system_prompt, user_prompt, client, temperature=1, json_mode=False)
 
 
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-def call_llm_robust(system_prompt, user_prompt, client, generation_mode='qwen-plus', json_mode=False):
+def call_llm_robust(system_prompt, user_prompt, client, generation_model='qwen-plus', json_mode=False):
     """
     A centralized function to handle all LLM interactions with retries.
     UPGRADE: Now requires the 'client' and 'generation_model' objects to be passed in.
@@ -69,7 +68,7 @@ def call_llm_robust(system_prompt, user_prompt, client, generation_mode='qwen-pl
         response_format = {"type": "json_object"} if json_mode else {"type": "text"}
         # UPGRADE: Uses the passed-in client and model name for the API call.
         response = client.chat.completions.create(
-            model=generation_mode,
+            model=generation_model,
             response_format=response_format,
             messages=[
                 {"role": "system", "content": system_prompt},
