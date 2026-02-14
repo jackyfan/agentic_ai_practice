@@ -1,19 +1,37 @@
-from agents import researcher_agent, writer_agent, agent_context_librarian
+import agents
+import logging
 
 
 class AgentRegistry:
     def __init__(self):
         self.agents = {
-            "Researcher": researcher_agent,
-            "Writer": writer_agent,
-            "Librarian": agent_context_librarian
+            "Researcher": agents.researcher_agent,
+            "Writer": agents.writer_agent,
+            "Librarian": agents.agent_context_librarian
         }
 
-    def get_agent(self, agent_name):
+    def get_agent(self, agent_name, client, index, generation_model,
+                  embedding_model, namespace_context, namespace_knowledge):
         agent = self.agents.get(agent_name)
         if not agent:
+            logging.error(f"Agent '{agent_name}' not found in registry.")
             raise ValueError(f"Agent '{agent_name}' not found in registry.")
-        return agent
+        if 'Librarian' in agent_name:
+            return lambda mcp_message: agent(mcp_message, client=client, index=index,
+                                             embedding_model=embedding_model,
+                                             namespace_context=namespace_context
+                                             )
+        elif 'Researcher' in agent_name:
+            return lambda mcp_message: agent(mcp_message, client=client, index=index,
+                                             generation_model=generation_model,
+                                             embedding_model=embedding_model,
+                                             namespace_knowledge=namespace_knowledge
+                                             )
+        elif 'Writer' in agent_name:
+            return lambda mcp_message: agent(mcp_message, client=client, generation_model=generation_model)
+
+        else:
+            return agent
 
     def get_capabilities_description(self):
         """Returns a structured description of the agents for the Planner LLM."""
