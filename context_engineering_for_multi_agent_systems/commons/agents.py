@@ -38,11 +38,12 @@ def researcher_agent(mcp_message, client, index, generation_model, embedding_mod
 
         if not sanitized_texts:
             logging.error("[Researcher] All retrieved chunks failed sanitization.Aborting.")
-            return create_mcp_message("Researcher", {"answer": "Could not generate a reliable answer as retrieved data was suspect.", "sources": []})
+            return create_mcp_message("Researcher",
+                                      {"answer": "Could not generate a reliable answer as retrieved data was suspect.",
+                                                "sources": []})
 
         # Synthesize the findings (Retrieve-and-Synthesize)
         logging.info(f"[Researcher] Found {len(sanitized_texts)} relevant chunks. Synthesizing answer with citations...")
-        source_texts = [match['metadata']['text'] for match in results]
         system_prompt = """You are an expert research synthesis AI. Your task is 
                         to provide a clear, factual answer to the user's topic based *only* on the 
                         provided source texts. After the answer, you MUST provide a "Sources" section 
