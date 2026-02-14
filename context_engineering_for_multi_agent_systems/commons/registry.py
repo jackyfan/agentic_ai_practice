@@ -7,7 +7,8 @@ class AgentRegistry:
         self.agents = {
             "Researcher": agents.researcher_agent,
             "Writer": agents.writer_agent,
-            "Librarian": agents.agent_context_librarian
+            "Librarian": agents.context_librarian_agent,
+            "Summarizer": agents.summarizer_agent
         }
 
     def get_agent(self, agent_name, client, index, generation_model,
@@ -27,6 +28,10 @@ class AgentRegistry:
                                              embedding_model=embedding_model,
                                              namespace_knowledge=namespace_knowledge
                                              )
+        elif agent_name == "Summarizer":
+            return lambda mcp_message: agent(mcp_message, client=client,
+                                             generation_model=generation_model
+                                             )
         elif 'Writer' in agent_name:
             return lambda mcp_message: agent(mcp_message, client=client, generation_model=generation_model)
 
@@ -35,29 +40,37 @@ class AgentRegistry:
 
     def get_capabilities_description(self):
         """Returns a structured description of the agents for the Planner LLM."""
+        # --- UPDATED: Add the Summarizer's capabilities ---
         return """
-    Available Agents and their required inputs.
-    CRITICAL: You MUST use the exact input key names provided for each agent.
-
-    1. AGENT: Librarian
-       ROLE: Retrieves Semantic Blueprints (style/structure instructions).
-       INPUTS:
-         - "intent_query": (String) A descriptive phrase of the desired style.
-       OUTPUT: The blueprint structure (JSON string).
-
-    2. AGENT: Researcher
-       ROLE: Retrieves and synthesizes factual information on a topic.
-       INPUTS:
-         - "topic_query": (String) The subject matter to research.
-       OUTPUT: Synthesized facts (String).
-
-    3. AGENT: Writer
-       ROLE: Generates or rewrites content by applying a Blueprint to source material.
-       INPUTS:
-         - "blueprint": (String/Reference) The style instructions (usually from Librarian).
-         - "facts": (String/Reference) Factual information (usually from Researcher).
-         - "previous_content": (String/Reference) Existing text for rewriting.
-       OUTPUT: The final generated text (String).
-    """
-
+            Available Agents and their required inputs.
+            CRITICAL: You MUST use the exact input key names provided for each agent.
+        
+            1. AGENT: Librarian
+               ROLE: Retrieves Semantic Blueprints (style/structure instructions).
+               INPUTS:
+                 - "intent_query": (String) A descriptive phrase of the desired style.
+               OUTPUT: The blueprint structure (JSON string).
+        
+            2. AGENT: Researcher
+               ROLE: Retrieves and synthesizes factual information on a topic.
+               INPUTS:
+                 - "topic_query": (String) The subject matter to research.
+               OUTPUT: Synthesized facts (String).
+        
+            3. AGENT: Summarizer
+               ROLE: Reduces large text to a concise summary based on a specific objective. Ideal for managing token counts before a generation step.
+               INPUTS:
+                 - "text_to_summarize": (String/Reference) The long text to be summarized.
+                 - "summary_objective": (String) A clear goal for the summary (e.g., "Extract key technical specifications").
+               OUTPUT: A dictionary containing the summary: {"summary": "..."}.
+        
+            4. AGENT: Writer
+               ROLE: Generates or rewrites content by applying a Blueprint to source material.
+               INPUTS:
+                 - "blueprint": (String/Reference) The style instructions (usually from Librarian).
+                 - "facts": (String/Reference) Factual information (usually from Researcher or Summarizer).
+                 - "previous_content": (String/Reference) Existing text for rewriting.
+               OUTPUT: The final generated text (String).
+        """
 AGENT_TOOLKIT = AgentRegistry()
+logging.info("Agent Registry initialized and fully upgraded.")

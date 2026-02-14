@@ -45,15 +45,21 @@ def writer_agent(mcp_message, client, generation_model):
     try:
         blueprint_data = mcp_message['content'].get('blueprint')
         facts_data = mcp_message['content'].get('facts')
-        previous_content_data = mcp_message['content'].get('previous_content')
+        previous_content = mcp_message['content'].get('previous_content')
 
         # Extract the actual strings, handling both dict and raw string inputs
         blueprint_json_string = blueprint_data.get('blueprint') \
             if isinstance(blueprint_data, dict) else blueprint_data
-        facts = facts_data.get('facts') \
-            if isinstance(facts_data, dict) else facts_data
-        # Assuming this is already a string if provided
-        previous_content = previous_content_data
+        # ROBUST LOGIC (for Chapter 6) for handling 'facts' or 'summary'
+        facts = None
+        if isinstance(facts_data, dict):
+            # First, try to get 'facts' (from Researcher)
+            facts = facts_data.get('facts')
+            # If that fails, try to get 'summary' (from Summarizer)
+            if facts is None:
+                facts = facts_data.get('summary')
+        elif isinstance(facts_data, str):
+            facts = facts_data
 
         if not blueprint_json_string:
             raise ValueError("Writer requires 'blueprint' in the input content.")
@@ -95,7 +101,6 @@ def writer_agent(mcp_message, client, generation_model):
         return create_mcp_message("Writer", final_output)
     except Exception as e:
         logging.error(f"[创作智能体] An error occurred: {e}")
-        print(f"【TypeError详情】: {str(e)}")
         raise e
 
 
@@ -137,7 +142,7 @@ def validate_mcp_message(message):
     return True
 
 
-def agent_context_librarian(mcp_message, client, index, embedding_model, namespace_context):
+def context_librarian_agent(mcp_message, client, index, embedding_model, namespace_context):
     """
      Retrieves the appropriate Semantic Blueprint from the Context Library.
      """
@@ -168,82 +173,40 @@ def agent_context_librarian(mcp_message, client, index, embedding_model, namespa
         raise e
 
 
-def orchestrator(high_level_goal):
+def summarizer_agent(mcp_message, client, generation_model):
     """
-    Manages the workflow of the Context-Aware MAS.
-    """
-    print("=" * 50)
-    print(f"[编排器] Goal Received: '{high_level_goal}'")
-    print("=" * 50)
-    client, pc = initialize_clients()
-    # --- Step 1: Orchestrator plans and calls the Researcher Agent ---
-    print("\n[Orchestrator] Analyzing Goal...")
-    analysis_system_prompt = """You are an expert goal analyst. Analyze the 
-    user's high-level goal and extract two components:
-     1. 'intent_query': A descriptive phrase summarizing the desired style, tone, 
-    or format, optimized for searching a context library (e.g., "suspenseful narrative 
-    blueprint", "objective technical explanation structure").
-     2. 'topic_query': A concise phrase summarizing the factual subject matter 
-    required (e.g., "Juno mission objectives and power", "Apollo 11 landing details").
-     Respond ONLY with a JSON object containing these two keys."""
-    # We request JSON mode for reliable parsing
-    analysis_result = call_llm(
-        system_prompt=analysis_system_prompt,
-        user_prompt=high_level_goal,
-        client=client,
-        json_mode=True)
-
+     Reduces a large text to a concise summary based on an objective.
+     Acts as a gatekeeper to manage token counts and costs.
+     """
+    logging.info("[摘要器智能体] Activated. Reducing context...")
     try:
-        analysis = json.loads(analysis_result)
-        intent_query = analysis['intent_query']
-        topic_query = analysis['topic_query']
-    except (json.JSONDecodeError, KeyError):
-        print(f"[Orchestrator] Error: Could not parse analysis JSON. Raw Analysis: {analysis_result}. Aborting.")
-        return
+        # Unpack the inputs from the MCP message
+        text_to_summarize = mcp_message['content'].get('text_to_summarize')
+        summary_objective = mcp_message['content'].get('summary_objective')
+        # The agent validates that it has received the necessary inputs before proceeding.
+        if not text_to_summarize or not summary_objective:
+            raise ValueError("Summarizer requires 'text_to_summarize' and 'summary_objective' in the input content.")
+        # Define the prompts for the LLM
+        system_prompt = """You are an expert summarization AI. 
+            Your task is to reduce the provided text to its essential points, guided by the user's specific objective. 
+            The summary must be concise, accurate, and directly address the stated goal."""
 
-    print(f"Orchestrator: Intent Query: '{intent_query}'")
-    print(f"Orchestrator: Topic Query: '{topic_query}'")
-
-    # Step 1: Get the Context Blueprint (Procedural RAG)
-    mcp_to_librarian = create_mcp_message(
-        sender="Orchestrator",
-        content={"intent_query": intent_query}
-    )
-    # display_mcp(mcp_to_librarian, "Orchestrator -> Librarian")
-    mcp_from_librarian = agent_context_librarian(mcp_to_librarian)
-    display_mcp(mcp_from_librarian, "Librarian -> Orchestrator")
-    context_blueprint = mcp_from_librarian['content'].get('blueprint')
-    if not context_blueprint: return
-    # Step 2: Get the Factual Knowledge (Factual RAG)
-    mcp_to_researcher = create_mcp_message(
-        sender="Orchestrator",
-        content={"topic_query": topic_query}
-    )
-    # display_mcp(mcp_to_researcher, "Orchestrator -> Researcher")
-    mcp_from_researcher = researcher_agent(mcp_to_researcher, client)
-    display_mcp(mcp_from_researcher, "Researcher -> Orchestrator")
-
-    research_findings = mcp_from_researcher['content'].get('facts')
-    if not research_findings: return
-
-    # Step 3: Generate the Final Output
-    # Combine the outputs for the Writer Agent
-    writer_task = {
-        "blueprint": context_blueprint,
-        "facts": research_findings
-    }
-
-    mcp_to_writer = create_mcp_message(
-        sender="Orchestrator",
-        content=writer_task
-    )
-
-    # display_mcp(mcp_to_writer, "Orchestrator -> Writer")
-    mcp_from_writer = writer_agent(mcp_to_writer, client)
-    display_mcp(mcp_from_writer, "Writer -> Orchestrator")
-    final_result = mcp_from_writer['content'].get('output')
-    print("\n=== [Orchestrator] Task Complete ===")
-    return final_result
+        user_prompt = f"""--- OBJECTIVE ---\n{summary_objective}\n\n
+        --- TEXT TO SUMMARIZE ---\n{text_to_summarize}\n--- END TEXT 
+        ---\n\nGenerate the summary now."""
+        # The agent calls the robust LLM helper function and returns the result.
+        # Call the hardened LLM helper to perform the summarization
+        summary = call_llm_robust(
+            system_prompt,
+            user_prompt,
+            client=client,
+            generation_model=generation_model
+        )
+        # Return the summary in the standard MCP format
+        return create_mcp_message("Summarizer", {"summary": summary})
+    except Exception as e:
+        logging.error(f"[Summarizer] An error occurred: {e}")
+        raise e
 
 
 def final_orchestrator(initial_goal):
@@ -319,14 +282,3 @@ def final_orchestrator(initial_goal):
     print("[编排器] Workflow Complete. Final Output:")
     print("=" * 50)
     print(final_output)
-
-
-if __name__ == "__main__":
-    print("********  1: SUSPENSEFUL NARRATIVE **********")
-    goal_1 = "Write a short, suspenseful scene for a children's story about the Apollo 11 moon landing, highlighting the danger."
-    result_1 = orchestrator(goal_1)
-
-    print("\n******** FINAL OUTPUT 1 **********\n")
-    print(result_1)
-
-    print("\n\n" + "=" * 50 + "\n\n")

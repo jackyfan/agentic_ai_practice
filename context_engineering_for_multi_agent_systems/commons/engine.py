@@ -196,8 +196,7 @@ def context_engine(goal, client, pc, index_name, generation_model, embedding_mod
 if __name__ == "__main__":
     logging.info("******** Example 1: Executing the Hardened Engine **********\n")
 
-    goal_1 = "Write a short, suspenseful scene for a children's story about the Apollo 11 moon landing, highlighting the danger."
-
+    goal = "First, write a factual summary of the Apollo 11 landing. Then, rewrite that summary in the minimalist, impactful style of Ernest Hemingway"
     # --- Define all configuration variables before the call ---
     INDEX_NAME = 'genai-mas-mcp-ch3'
     GENERATION_MODEL = "qwen-plus"
@@ -214,7 +213,7 @@ if __name__ == "__main__":
     # We now pass ALL dependencies—clients, configurations, and namespaces—into the engine.
     client,pc = initialize_clients()
     result_1, trace_1 = context_engine(
-        goal_1,
+        goal,
         client=client,
         pc=pc,
         index_name=INDEX_NAME,

@@ -131,7 +131,7 @@ def query_pinecone(query_text, namespace, top_k, index, client, embedding_model)
         return []
 
 
-def count_tokens(text, model="gpt-5"):
+def count_tokens(text, model="qwen-plus"):
     """Counts the number of tokens in a text string for a given model."""
     try:
         encoding = tiktoken.encoding_for_model(model)
