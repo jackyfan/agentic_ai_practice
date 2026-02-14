@@ -3,6 +3,11 @@ import logging
 from openai import APIError
 import textwrap
 from tenacity import retry, stop_after_attempt, wait_random_exponential
+import tiktoken
+
+# === Configure Production-Level Logging ===
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def create_mcp_message(sender, content, metadata=None):
@@ -32,8 +37,9 @@ def call_llm(system_prompt, user_prompt):
     except Exception as e:
         return f"An error occurred with the API call: {e}"
 
+
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-def call_llm(system_prompt, user_prompt,client, temperature=1, json_mode=False):
+def call_llm(system_prompt, user_prompt, client, temperature=1, json_mode=False):
     """A centralized function to handle all LLM interactions with retries."""
     try:
         response_format = {"type": "json_object"} if json_mode else {"type": "text"}
@@ -48,66 +54,63 @@ def call_llm(system_prompt, user_prompt,client, temperature=1, json_mode=False):
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        print(f"Error calling LLM: {e}")
+        logging.error(f"Error calling LLM: {e}")
         return f"LLM Error: {e}"
 
 
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-def call_llm_robust(system_prompt, user_prompt, client, json_mode=False):
+def call_llm_robust(system_prompt, user_prompt, client, generation_mode='qwen-plus', json_mode=False):
     """
     A centralized function to handle all LLM interactions with retries.
     UPGRADE: Now requires the 'client' and 'generation_model' objects to be passed in.
     """
-    print("Attempting to call LLM...")
+    logging.info("Attempting to call LLM...")
     try:
         response_format = {"type": "json_object"} if json_mode else {"type": "text"}
         # UPGRADE: Uses the passed-in client and model name for the API call.
         response = client.chat.completions.create(
-            model="qwen-plus",
+            model=generation_mode,
             response_format=response_format,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
         )
-        print("LLM call successful.")
+        logging.info("LLM call successful.")
         return response.choices[0].message.content.strip()
     except APIError as e:
-        print(f"OpenAI API Error in call_llm_robust: {e}")
+        logging.error(f"OpenAI API Error in call_llm_robust: {e}")
         raise e
     except Exception as e:
-        print(f"An unexpected error occurred in call_llm_robust: {e}")
+        logging.error(f"An unexpected error occurred in call_llm_robust: {e}")
         raise e
 
+
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-def get_embedding(text):
+def get_embedding(text,client,embedding_model = 'text-embedding-v2'):
     """
     Generates embeddings for a single text query with retries.
-    UPGRADE: Now requires the 'client' and 'embedding_model' objects.
     """
-    client, _ = initialize_clients()
-    embedding_model = "text-embedding-v2"
     text = text.replace("\n", " ")
     try:
-        # UPGRADE: Uses the passed-in client and model name.
         response = client.embeddings.create(input=[text], model=embedding_model)
         return response.data[0].embedding
     except APIError as e:
-        print(f"OpenAI API Error in get_embedding: {e}")
+        logging.error(f"LLM API Error in get_embedding: {e}")
         raise e
     except Exception as e:
-        print(f"An unexpected error occurred in get_embedding: {e}")
+        logging.error(f"An unexpected error occurred in get_embedding: {e}")
         raise e
 
 
 def display_mcp(message, title="MCP Message"):
     """Helper function to display MCP messages clearly during the trace."""
-    print(f"\n--- {title} (Sender: {message['sender']}) ---")
+    logging.info(f"\n--- {title} (Sender: {message['sender']}) ---")
     # Display content snippet or keys if content is complex
     if isinstance(message['content'], dict):
-        print(f"Content Keys: {list(message['content'].keys())}")
+        logging.info(f"Content Keys: {list(message['content'].keys())}")
     else:
-        print(f"Content: {textwrap.shorten(str(message['content']), width=100)}")
+        logging.info(f"Content: {textwrap.shorten(str(message['content']), width=100)}")
     # Display metadata keys
     print(f"Metadata Keys: {list(message['metadata'].keys())}")
     print("-" * (len(title) + 25))
@@ -117,7 +120,7 @@ def query_pinecone(query_text, namespace, top_k=1):
     """Embeds the query text and searches the specified Pinecone namespace."""
     try:
         query_embedding = get_embedding(query_text)
-        _,pc = initialize_clients()
+        _, pc = initialize_clients()
         INDEX_NAME = 'genai-mas-mcp-ch3'
         response = pc.Index(INDEX_NAME).query(
             vector=query_embedding,
@@ -129,3 +132,16 @@ def query_pinecone(query_text, namespace, top_k=1):
     except Exception as e:
         print(f"Error querying Pinecone (Namespace: {namespace}): {e}")
         return []
+
+
+def count_tokens(text, model="gpt-5"):
+    """Counts the number of tokens in a text string for a given model."""
+    try:
+        encoding = tiktoken.encoding_for_model(model)
+    except KeyError:
+        # Fallback for models that might not be in the tiktoken registry
+        encoding = tiktoken.get_encoding("cl100k_base")
+    return len(encoding.encode(text))
+
+
+logging.info("✅ Helper functions defined and upgraded.")
