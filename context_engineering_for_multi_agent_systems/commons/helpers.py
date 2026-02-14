@@ -1,4 +1,4 @@
-from utils import initialize_clients
+from .utils import initialize_clients
 import logging
 from openai import APIError
 import textwrap

@@ -3,11 +3,6 @@ import time
 from tqdm.auto import tqdm
 import tiktoken
 from pinecone import Pinecone, ServerlessSpec
-from tenacity import retry, stop_after_attempt, wait_random_exponential
-import re
-import textwrap
-import copy
-import os
 from commons.utils import initialize_clients
 
 

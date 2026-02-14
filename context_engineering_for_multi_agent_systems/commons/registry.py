@@ -1,4 +1,4 @@
-import agents
+from . import agents
 import logging
 
 

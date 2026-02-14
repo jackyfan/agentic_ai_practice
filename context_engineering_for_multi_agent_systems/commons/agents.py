@@ -1,8 +1,7 @@
-from helpers import (
+from .helpers import (
     create_mcp_message,
-    call_llm_robust,
-    call_llm, query_pinecone, display_mcp)
-from utils import initialize_clients
+    call_llm_robust, query_pinecone, helper_sanitize_input)
+from .utils import initialize_clients
 import json
 import logging
 
@@ -19,19 +18,41 @@ def researcher_agent(mcp_message, client, index, generation_model, embedding_mod
         # Query Pinecone Knowledge Namespace
         results = query_pinecone(query_text=topic, namespace=namespace_knowledge,
                                  top_k=3, index=index, client=client, embedding_model=embedding_model)
-        if not results:
-            logging.info("[Researcher] No relevant information found.")
-            return create_mcp_message("Researcher", {"facts": "No data found."})
-        # Synthesize the findings (Retrieve-and-Synthesize)
-        logging.info(f"[Researcher] Found {len(results)} relevant chunks. Synthesizing...")
-        source_texts = [match['metadata']['text'] for match in results]
-        system_prompt = """You are an expert research synthesis AI.
-            Synthesize the provided source texts into a concise, bullet-pointed summary relevant to the user's topic. 
-            Focus strictly on the facts provided in the sources. Do not add outside information."""
+        # Sanitize and Prepare Source Texts
+        sanitized_texts = []
+        sources = set()
+        for match in results:
+            try:
+                clean_text = helper_sanitize_input(
+                    match['metadata']['text'])
+                sanitized_texts.append(clean_text)
+                if 'source' in match['metadata']:
+                    sources.add(match['metadata']['source'])
+            except ValueError as e:
+                logging.warning(f"[Researcher] A retrieved chunk failed sanitization and was skipped.Reason: {e}")
+                continue
 
-        user_prompt = f"Topic: {topic}\n\nSources:\n" + "\n\n---\n\n".join(source_texts)
-        findings = call_llm_robust(system_prompt, user_prompt, client, generation_model=generation_model)
-        return create_mcp_message("Researcher", {"facts": findings})
+        if not sanitized_texts:
+            logging.error("[Researcher] All retrieved chunks failed sanitization.Aborting.")
+            return create_mcp_message("Researcher", {"answer": "Could not generate a reliable answer as retrieved data was suspect.", "sources": []})
+
+        # Synthesize the findings (Retrieve-and-Synthesize)
+        logging.info(f"[Researcher] Found {len(sanitized_texts)} relevant chunks. Synthesizing answer with citations...")
+        source_texts = [match['metadata']['text'] for match in results]
+        system_prompt = """You are an expert research synthesis AI. Your task is 
+                        to provide a clear, factual answer to the user's topic based *only* on the 
+                        provided source texts. After the answer, you MUST provide a "Sources" section 
+                        listing the unique source document names you used."""
+
+        source_material = "\n\n---\n\n".join(sanitized_texts)
+        user_prompt = f"Topic: {topic}\n\nSources:\n{source_material}\n\n--- \nSynthesize your answer and list the source documents now."
+        findings = call_llm_robust(system_prompt, user_prompt, client=client, generation_model=generation_model)
+        # We can also append the sources we found programmatically for robustness
+        final_output = f"{findings}\n\n**Sources:**\n" + "\n".join(
+            [f"- {s}" for s in sorted(list(sources))])
+        return create_mcp_message(
+            "Researcher", {"answer_with_sources": final_output}
+        )
     except Exception as e:
         logging.error(f"[Researcher] An error occurred: {e}")
         raise e
