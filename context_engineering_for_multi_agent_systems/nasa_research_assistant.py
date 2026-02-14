@@ -10,7 +10,7 @@ config = {
     "namespace_knowledge": 'KnowledgeStore'
 }
 
-goal = "What are the primary scientific objectives of the Juno mission, and what makes its design unique? Please cite your sources."
+goal = "中国春节的来历是什么？"
 
 logging.info(f"******** Starting Engine for Goal: '{goal}' **********\n")
 client, pc = initialize_clients()

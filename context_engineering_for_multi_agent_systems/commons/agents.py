@@ -18,6 +18,10 @@ def researcher_agent(mcp_message, client, index, generation_model, embedding_mod
         # Query Pinecone Knowledge Namespace
         results = query_pinecone(query_text=topic, namespace=namespace_knowledge,
                                  top_k=3, index=index, client=client, embedding_model=embedding_model)
+        if not results:
+            logging.warning("[Researcher] No relevant information found.")
+            return create_mcp_message("Researcher", {"answer": "No data found on the topic.", "sources": []})
+
         # Sanitize and Prepare Source Texts
         sanitized_texts = []
         sources = set()
