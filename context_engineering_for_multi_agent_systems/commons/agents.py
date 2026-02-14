@@ -79,6 +79,8 @@ def writer_agent(mcp_message, client, generation_model):
             # If that fails, try to get 'summary' (from Summarizer)
             if facts is None:
                 facts = facts_data.get('summary')
+            if facts is None:
+                facts = facts_data.get('answer_with_sources')
         elif isinstance(facts_data, str):
             facts = facts_data
 
