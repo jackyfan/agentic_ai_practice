@@ -31,7 +31,6 @@ def researcher_agent(mcp_message, client, index, generation_model, embedding_mod
 
         user_prompt = f"Topic: {topic}\n\nSources:\n" + "\n\n---\n\n".join(source_texts)
         findings = call_llm_robust(system_prompt, user_prompt, client, generation_model=generation_model)
-        logging.info(f"[Researcher] Synthesized findings: {findings}")
         return create_mcp_message("Researcher", {"facts": findings})
     except Exception as e:
         logging.error(f"[Researcher] An error occurred: {e}")
@@ -86,7 +85,6 @@ def writer_agent(mcp_message, client, generation_model):
 
                Generate the content now, following the blueprint precisely.
                """
-        logging.info('[创作智能体] Call LLM...')
         # UPGRADE: Pass all dependencies to the robust LLM call.
         final_output = call_llm_robust(
             system_prompt,
@@ -94,7 +92,6 @@ def writer_agent(mcp_message, client, generation_model):
             client=client,
             generation_model=generation_model
         )
-        logging.info(f'final_output：{final_output}', )
         return create_mcp_message("Writer", final_output)
     except Exception as e:
         logging.error(f"[创作智能体] An error occurred: {e}")

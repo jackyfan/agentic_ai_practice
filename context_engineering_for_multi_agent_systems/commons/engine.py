@@ -172,7 +172,6 @@ def context_engine(goal, client, pc, index_name, generation_model, embedding_mod
             # Create an MCP message with the RESOLVED input for the agent
             mcp_resolved_input = create_mcp_message(
                 "Engine", resolved_input)
-            logging.info(f"[引擎:执行器] Resolved input for {agent_name}: {mcp_resolved_input}")
             mcp_output = agent(mcp_resolved_input)
             # Update State and Log Trace
             output_data = mcp_output["content"]
