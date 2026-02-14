@@ -87,7 +87,7 @@ def call_llm_robust(system_prompt, user_prompt, client, generation_mode='qwen-pl
 
 
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-def get_embedding(text,client,embedding_model = 'text-embedding-v2'):
+def get_embedding(text, client, embedding_model='text-embedding-v2'):
     """
     Generates embeddings for a single text query with retries.
     """
@@ -116,13 +116,11 @@ def display_mcp(message, title="MCP Message"):
     print("-" * (len(title) + 25))
 
 
-def query_pinecone(query_text, namespace, top_k=1):
+def query_pinecone(query_text, namespace, top_k, index, client, embedding_model):
     """Embeds the query text and searches the specified Pinecone namespace."""
     try:
-        query_embedding = get_embedding(query_text)
-        _, pc = initialize_clients()
-        INDEX_NAME = 'genai-mas-mcp-ch3'
-        response = pc.Index(INDEX_NAME).query(
+        query_embedding = get_embedding(query_text,client, embedding_model)
+        response = index.query(
             vector=query_embedding,
             namespace=namespace,
             top_k=top_k,
@@ -130,7 +128,7 @@ def query_pinecone(query_text, namespace, top_k=1):
         )
         return response['matches']
     except Exception as e:
-        print(f"Error querying Pinecone (Namespace: {namespace}): {e}")
+        logging.error(f"Error querying Pinecone (Namespace: {namespace}): {e}")
         return []
 
 
@@ -142,6 +140,3 @@ def count_tokens(text, model="gpt-5"):
         # Fallback for models that might not be in the tiktoken registry
         encoding = tiktoken.get_encoding("cl100k_base")
     return len(encoding.encode(text))
-
-
-logging.info("✅ Helper functions defined and upgraded.")
